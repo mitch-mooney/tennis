@@ -1,0 +1,108 @@
+---
+title: "Tennis"
+output: html_document
+---
+## Set up environment for analysis
+```{r setup, include=FALSE}
+library(dplyr)
+library(plotly)
+library(ggplot2)
+#source of files http://www.tennis-data.co.uk/ausopen.php
+wta<-read.csv("Data/WTA_ausopen.csv", stringsAsFactors = F)
+atp<-read.csv("Data/ATP_ausopen.csv", stringsAsFactors = F)
+
+```
+
+## Clean data
+Betting odds were from Bet365 agency
+```{r}
+# General data cleaning
+wta <- wta %>%
+  rename(
+  tour = WTA)
+wta$tour <- "WTA"
+
+atp <- atp %>%
+  rename(
+    tour = ATP)
+atp$tour <- "ATP"
+
+wta <- wta %>% 
+  select(tour, Tournament, Date, Round, Winner, Loser, WRank, LRank, WPts, LPts, Comment, B365W, B365L) 
+atp <- atp %>% 
+  select(tour, Tournament, Date, Round, Winner, Loser, WRank, LRank, WPts, LPts, Comment, B365W, B365L) 
+
+aus_open<-rbind(atp, wta)
+aus_open$WRank <- as.integer(aus_open$WRank)
+aus_open$LRank <- as.integer(aus_open$LRank)
+aus_open$WPts <- as.integer(aus_open$WPts)
+aus_open$LPts <- as.integer(aus_open$LPts)
+
+aus_open$Date <- as.Date(aus_open$Date, "%d/%m/%y")
+
+aus_open <- aus_open %>% 
+  mutate(favorite = ifelse(B365W > B365L, 0, 1))%>%
+  mutate(rank_win = ifelse(WRank > LRank, 0, 1))
+aus_open$favorite <- as.factor(aus_open$favorit)
+aus_open$rank_win <- as.factor(aus_open$rank_win)
+aus_open$year = as.character(format(aus_open$Date, format = "%Y"))
+#randomly assign 10% of people as ill
+aus_open$W_ill <- as.character(rbinom(n=2794, size=1, prob=0.05))
+aus_open$L_ill <- as.character(rbinom(n=2794, size=1, prob=0.05))
+```
+
+## Including Plots
+### Plot the proportion of correct times the favorite won in Australian Open from 2010 - 2020.
+Blue (favorite = 1) represents that the favorite won, while red (favorite = 0) represents the favorite lost
+```{r pressure, echo=FALSE}
+plotly_build(aus_open%>%
+              ggplot(aes(x = year, fill = favorite))+
+              geom_bar(aes(y = (..count..)), position = "fill")+
+              ggtitle("Proportion of rankings favorites in Aus Open")+
+              ylab("proportion"))
+```
+
+### Plot the proportion of times the favorite won during from the 4th round.
+Blue (favorite = 1) represents that the favorite won, while red (favorite = 0) represents the favorite lost
+```{r}
+plotly_build(aus_open%>%
+              filter(Round == "4th Round"|Round == "Quarterfinals"| Round == "Semifinals" | Round == "The Final")%>%
+              ggplot(aes(x = year, fill = favorite))+
+              geom_bar(aes(y = (..count..)), position = "fill")+
+              ggtitle("Proportion of rankings favorites in Aus Open: Finals")+
+              ylab("proportion"))
+```
+
+### Plot the proportion of favorites who still won while being sick
+Blue (favorite = 1) represents that the favorite won, while red (favorite = 0) represents the favorite lost
+```{r}
+plotly_build(aus_open%>%
+               filter(W_ill == 1) %>% 
+               ggplot(aes(x = year, fill = favorite))+
+               geom_bar(aes(y = (..count..)), position = "fill")+
+               ggtitle("Proportion of winners by betting odds favorites in Aus Open: when winner is sick")+
+               ylab("proportion"))
+```
+
+### Plot the proportion of favorites that win when the loser is sick.
+Blue (favorite = 1) represents that the favorite won, while red (favorite = 0) represents the favorite lost
+```{r}
+plotly_build(aus_open%>%
+               filter(L_ill == 1) %>% 
+               ggplot(aes(x = year, fill = favorite))+
+               geom_bar(aes(y = (..count..)), position = "fill")+
+               ggtitle("Proportion of rankings favorites in Aus Open: when loser is sick")+
+               ylab("proportion"))
+```
+
+### Look at how often when the non-favorite won the proportion of times the non-favorite was sick.
+Blue (L_ill = 1) represents that the favorite was sick, while red (L_ill = 0) represents the favorite wasn't sick.
+
+```{r}
+plotly_build(aus_open%>%
+               filter(favorite == 0) %>% #filter favorite that lost
+               ggplot(aes(x = year, fill = L_ill))+
+               geom_bar(aes(y = (..count..)), position = "fill")+
+               ggtitle("Proportion of favorites who lost in Aus Open when sick")+
+               ylab("proportion"))
+```
