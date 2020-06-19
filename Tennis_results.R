@@ -152,7 +152,7 @@ history <- model %>%
 
 plot(history)
 
-#evalute model from test dataset
+#evaluate model from test data set to determine generalisability of the model
 model %>% 
   evaluate(test, testLabels)
 # look at the model prediction probabilities
@@ -165,7 +165,7 @@ pred <- model %>%
 table(Predicted = pred, Actual = testtarget)
 
 
-#put down predictions for all matches to add to score_margin dataframe
+#put down prediction probabilities for all matches to add to tennis dataframe
 x<-data[,2:col_num]
 all_match_pred<-model %>% predict_proba(x)
 
@@ -177,14 +177,16 @@ margin_data <- tennis %>%
 
 #plot correlation between win probability and Margin
 my.formula <- y ~ x
-margin_data%>%
-  #filter(PlayerA_win_Prob >0.5)%>%
-  ggplot(aes(x = PlayerA_win_Prob, y = player_A_margin))+
+tennis%>%
+  ggplot(aes(x = PlayerA_win_Prob, y = player_A_gamesProp))+
   geom_point()+
   geom_smooth(method = "glm", se=TRUE, color="blue", formula = my.formula) +
   stat_poly_eq(formula = my.formula, 
                aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")), 
-               parse = TRUE)   
+               parse = TRUE)+
+  ggtitle("Correlation between win probability estimate and proportion of actual games won") +
+  xlab("Win Probability")+
+  ylab("Proportion of games won")
 # put prediction probabilities into categories
 tennis<-tennis %>%
   mutate(pred_cat = ifelse(PlayerA_win_Prob < 0.1, 1, 
@@ -201,7 +203,11 @@ tennis$pred_cat <- as.factor(tennis$pred_cat)
 #filter out all Retired matches
 tennis <- tennis %>% 
   filter(Comment != "Retired")
-
+# New facet label names for supp variable
+tennis$pred_cat <- factor(tennis$pred_cat, levels = c(1,2,3,4,5,6,7,8,9,10), 
+                          labels = c("0-10%", "10-20%", "20-30%", "30-40%", "40-50%", "50-60%", "60-70%", "70-80%", "80-90%", "90-100%"))
+tennis$Tour <- factor(tennis$Tour, levels =  c(1,2),
+                      labels = c("ATP", "WTA"))
 # Find the mean, median and SD of proportion to matches won by prediction category; prediction category and mens(1)/womens(2) tour
 library(plyr) # use plyr package
 Toursum_pred_cat <- ddply(tennis, .(pred_cat, Tour), summarise, rating.mean=mean(player_A_gamesProp), rating.sd = sd(player_A_gamesProp), rating.median = median(player_A_gamesProp))
@@ -217,7 +223,9 @@ ggplot(tennis, aes(x=player_A_gamesProp, color=pred_cat)) +
              linetype="dashed", size=1)+
   theme(legend.position="top")+
   xlim(0,1)+
-  facet_grid(pred_cat ~.)
+  xlab("Proportion of games won")+
+  facet_grid(pred_cat ~., labeller = labeller(pred_cat = supp.labs)
+  )
 
 #write.csv(tennis, 'tennis.csv')
 
